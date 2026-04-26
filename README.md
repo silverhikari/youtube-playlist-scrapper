@@ -45,5 +45,6 @@ four known issues that will be displayed via stderr:
 * no youtube-api-key.txt file is found (the program will generate this file next to the script if it is not found)
 * no google api key located in youtube-api-key.txt
 * invalid youtube url
+* invalid google api key
 
 anything else post an issue
