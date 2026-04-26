@@ -115,6 +115,7 @@ def get_playlist_info(playlist_id) -> tuple:
             return (channel_json, playlist_json)
     except(HttpError):
         print("invalid google api key", file=sys.stderr)
+        sys.exit(5)
         
 
 def generate_json_feed(playlist_info: tuple):
