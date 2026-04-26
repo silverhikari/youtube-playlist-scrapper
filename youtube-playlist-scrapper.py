@@ -24,7 +24,7 @@ limitations under the License.
 
 Youtube API v3 playlist scrapper
 
-VERSION: v1.0
+VERSION: v2.0
 
 this scrapper use the Youtube APIv3 to allow for podcasts/playlists to have more than 15 items, useful if you want to watch a long running series.
 this use 1 quota for to get playlist details such as title, description, along with channel id and channel name and 1 quote for every 50 items in a playlist, so for a playlist of 150 items it would cost 4 quota.
@@ -54,30 +54,32 @@ import json
 import sys
 import re
 from pathlib import Path
+
 try:
     from googleapiclient.discovery import build
 except(ModuleNotFoundError):
     print("module google-api-python-client not found", file=sys.stderr)
     sys.exit(1)
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, HttpError
 
 current_dir = Path(__file__).resolve().parent
 api_file = Path(f"{current_dir}/youtube-api-key.txt")
-if api_file.is_file():
-    with open("youtube-api-key.txt", 'r', encoding="utf-8") as keyfile:
-        API_Key = keyfile.readline().strip()
-else:
-    with open("youtube-api-key.txt", 'w', encoding="utf-8"):
-        print("place google api key in youtube-api-key.txt, without any extra characters", file=sys.stderr)
-        sys.exit(2)
 
-if API_Key == "":
-    print("no google cloud api key found", file=sys.stderr)
-    sys.exit(3)
-else:
-    youtube = build('youtube', 'v3', developerKey=API_Key)
+def get_api_key() -> str:
+    if api_file.is_file():
+        with open("youtube-api-key.txt", 'r', encoding="utf-8") as keyfile:
+            API_Key = keyfile.readline().strip()
+            if API_Key == "":
+                print("no google cloud api key found", file=sys.stderr)
+                sys.exit(3)
+            else:
+                return API_Key
+    else:
+        with open("youtube-api-key.txt", 'w', encoding="utf-8"):
+            print("place google api key in youtube-api-key.txt, without any extra characters", file=sys.stderr)
+            sys.exit(2)
 
-def get_playlist_details(playlist_id: str) -> list:
+def get_playlist_details(playlist_id: str, youtube) -> list:
     details = youtube.playlists().list(
         part='snippet',
         id=[playlist_id],
@@ -85,7 +87,7 @@ def get_playlist_details(playlist_id: str) -> list:
     ).execute()
     return details['items']
 
-def get_playlist_videos(playlist_id: str) -> list:
+def get_playlist_videos(playlist_id: str, youtube) -> list:
     videos = []
     next_page_token = None
     
@@ -105,33 +107,46 @@ def get_playlist_videos(playlist_id: str) -> list:
             break
     return videos
 
-if len(sys.argv) < 2 or len(sys.argv) >= 3:
-    print("Usage: python youtube-playlist-scrapper.py playlist_url")
-else:
-    if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', sys.argv[1]):
-        playlist_id = match.group(1)
-    else: 
-        print("non-valid youtube url", file=sys.stderr)
-        sys.exit(4)
+def get_playlist_info(playlist_id) -> tuple:
+    try:
+        with build('youtube', 'v3', developerKey=get_api_key()) as youtube:
+            channel_json = get_playlist_details(playlist_id, youtube)[0]
+            playlist_json = get_playlist_videos(playlist_id, youtube)
+            return (channel_json, playlist_json)
+    except(HttpError):
+        print("invalid google api key", file=sys.stderr)
+        
 
-channel_json = get_playlist_details(playlist_id)[0]
-playlist_json = get_playlist_videos(playlist_id)
+def generate_json_feed(playlist_info: tuple):
+    channel_json = playlist_info[0]
+    playlist_json = playlist_info[1]
+    formatted_items = []
+    json_feed = {"version": "https://jsonfeed.org/version/1.1", "title": f"{channel_json["snippet"]["title"]}",
+        "home_page_url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}", 
+        "description": f"{channel_json["snippet"]["description"]}",
+        "authors": [{"name": f"{channel_json["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}"}]}             
 
-json_feed = {"version": "https://jsonfeed.org/version/1.1", "title": f"{channel_json["snippet"]["title"]}",
-             "home_page_url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}", 
-             "description": f"{channel_json["snippet"]["description"]}",
-             "authors": [{"name": f"{channel_json["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}"}]}             
-
-formatted_items = []
-for video in playlist_json:
-    item = {"id": f"www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}", "url": f"https://www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}/", 
+    for video in playlist_json:
+        item = {"id": f"www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}", "url": f"https://www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}/", 
             "title": f"{video["snippet"]["title"]}", "content_text": f"{video["snippet"]["description"]}", "date_published": f"{video["snippet"]["publishedAt"]}",
             "attachments": [{"url": f"{video["snippet"]["thumbnails"]["high"]["url"]}", "mime_type": "image/jpeg", "title":"thumbnail"}]
             }
-    formatted_items.append(item)
+        formatted_items.append(item)
 
-json_feed["items"] = formatted_items
+    json_feed["items"] = formatted_items
+    json_feed = json.dumps(json_feed)
+    print(json_feed)
 
-json_feed = json.dumps(json_feed)
+def main():
+    if len(sys.argv) < 2 or len(sys.argv) >= 3:
+        print("Usage: python youtube-playlist-scrapper.py playlist_url")
+    else:
+        if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', sys.argv[1]):
+            playlist_id = match.group(1)
+        else: 
+            print("non-valid youtube url", file=sys.stderr)
+            sys.exit(4)
+    generate_json_feed(get_playlist_info(playlist_id))
 
-print(json_feed)
+if __name__ == "__main__":
+    main()
