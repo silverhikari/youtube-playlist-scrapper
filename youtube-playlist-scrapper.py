@@ -1,0 +1,137 @@
+#! /usr/bin/env python3
+
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "google-api-python-client>=2.194.0",
+# ]
+# ///
+
+'''
+Copyright 2026 Ethan Kerrick
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Youtube API v3 playlist scrapper
+
+VERSION: v1.0
+
+this scrapper use the Youtube APIv3 to allow for podcasts/playlists to have more than 15 items, useful if you want to watch a long running series.
+this use 1 quota for to get playlist details such as title, description, along with channel id and channel name and 1 quote for every 50 items in a playlist, so for a playlist of 150 items it would cost 4 quota.
+
+!!!THIS REQUIRES A GOOGLE CLOUD API KEY!!!
+!!!THIS SCRIPT ONLY WORKS ON PUBLIC PLAYLISTS!!!
+
+Steps:
+
+1. create a project at "console.cloud.google.com", and name it "youtube-rss" or something like that
+
+2. select the newly create project
+
+2. hit the "library" tab on the sidebar, and using the search bar look for "Youtube Data API v3", and enable it for the project
+
+3. go to credentials and click "create credentials" and select api key
+
+4. in sidebar that pops up, name the keys something and under api restrictions select "Youtube Data Api v3"
+
+5. once done click show key, and copy api key
+
+6. either create the file "youtube-api-key.txt" next to this script, and place the generated key into the first line of the file with nothing before or after
+(the program will attempt to remove whitespace when reading the key but still better to not add it), or you can run the script first it will generate the file if it is not there
+'''
+
+import json
+import sys
+import re
+from pathlib import Path
+try:
+    from googleapiclient.discovery import build
+except(ModuleNotFoundError):
+    print("module google-api-python-client not found", file=sys.stderr)
+    sys.exit(1)
+from googleapiclient.discovery import build
+
+current_dir = Path(__file__).resolve().parent
+api_file = Path(f"{current_dir}/youtube-api-key.txt")
+if api_file.is_file():
+    with open("youtube-api-key.txt", 'r', encoding="utf-8") as keyfile:
+        API_Key = keyfile.readline().strip()
+else:
+    with open("youtube-api-key.txt", 'w', encoding="utf-8"):
+        print("place google api key in youtube-api-key.txt, without any extra characters", file=sys.stderr)
+        sys.exit(2)
+
+if API_Key == "":
+    print("no google cloud api key found", file=sys.stderr)
+    sys.exit(3)
+else:
+    youtube = build('youtube', 'v3', developerKey=API_Key)
+
+def get_playlist_details(playlist_id: str) -> list:
+    details = youtube.playlists().list(
+        part='snippet',
+        id=[playlist_id],
+        fields="items(snippet(channelId,title,description,channelTitle))"
+    ).execute()
+    return details['items']
+
+def get_playlist_videos(playlist_id: str) -> list:
+    videos = []
+    next_page_token = None
+    
+    while True:
+        res = youtube.playlistItems().list(
+            part='snippet',
+            playlistId=playlist_id,
+            maxResults=50,
+            pageToken=next_page_token,
+            fields="nextPageToken,items(snippet(publishedAt,title,description,thumbnails(high),resourceId(videoId)))",
+        ).execute()
+        
+        videos.extend(res['items'])
+        next_page_token = res.get('nextPageToken')
+        
+        if not next_page_token:
+            break
+    return videos
+
+if len(sys.argv) < 2 or len(sys.argv) >= 3:
+    print("Usage: python youtube-playlist-scrapper.py playlist_url")
+else:
+    if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', sys.argv[1]):
+        playlist_id = match.group(1)
+    else: 
+        print("non-valid youtube url", file=sys.stderr)
+        sys.exit(4)
+
+channel_json = get_playlist_details(playlist_id)[0]
+playlist_json = get_playlist_videos(playlist_id)
+
+json_feed = {"version": "https://jsonfeed.org/version/1.1", "title": f"{channel_json["snippet"]["title"]}",
+             "home_page_url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}", 
+             "description": f"{channel_json["snippet"]["description"]}",
+             "authors": [{"name": f"{channel_json["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}"}]}             
+
+formatted_items = []
+for video in playlist_json:
+    item = {"id": f"www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}", "url": f"https://www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}/", 
+            "title": f"{video["snippet"]["title"]}", "content_text": f"{video["snippet"]["description"]}", "date_published": f"{video["snippet"]["publishedAt"]}",
+            "attachments": [{"url": f"{video["snippet"]["thumbnails"]["high"]["url"]}", "mime_type": "image/jpeg", "title":"thumbnail"}]
+            }
+    formatted_items.append(item)
+
+json_feed["items"] = formatted_items
+
+json_feed = json.dumps(json_feed)
+
+print(json_feed)
