@@ -5,10 +5,10 @@ scrapes a youtube playlist via youtube apiv3 using an google api key and generat
 this use 1 quota for to get playlist details such as title, description, along with channel id and channel name and 1 quote for every 50 items in a playlist, so for a playlist of 150 items it would cost 4 quota.
 
 > [!IMPORTANT]
-> !!!THIS REQUIRES A GOOGLE CLOUD API KEY!!!
+> this script requires a google api key. if you do not know how to set one up check inside script.
 
 > [!CAUTION]
-> !!!THIS SCRIPT ONLY WORKS ON PUBLIC PLAYLISTS!!!
+> this script only works on public playlists
 
 ## Requirements
 
