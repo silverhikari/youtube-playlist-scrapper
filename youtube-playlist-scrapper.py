@@ -67,7 +67,7 @@ api_file = Path(f"{current_dir}/youtube-api-key.txt")
 
 def get_api_key() -> str:
     if api_file.is_file():
-        with open("youtube-api-key.txt", 'r', encoding="utf-8") as keyfile:
+        with open(api_file, 'r', encoding="utf-8") as keyfile:
             API_Key = keyfile.readline().strip()
             if API_Key == "":
                 print("no google cloud api key found", file=sys.stderr)
@@ -75,7 +75,7 @@ def get_api_key() -> str:
             else:
                 return API_Key
     else:
-        with open("youtube-api-key.txt", 'w', encoding="utf-8"):
+        with open(api_file, 'w', encoding="utf-8"):
             print("place google api key in youtube-api-key.txt, without any extra characters", file=sys.stderr)
             sys.exit(2)
 
