@@ -116,7 +116,7 @@ def get_playlist_info(playlist_id) -> tuple:
     except(HttpError):
         print("invalid google api key", file=sys.stderr)
         sys.exit(5)
-        
+
 
 def generate_json_feed(playlist_info: tuple):
     channel_json = playlist_info[0]
@@ -128,12 +128,14 @@ def generate_json_feed(playlist_info: tuple):
         "authors": [{"name": f"{channel_json["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}"}]}             
 
     for video in playlist_json:
-        item = {"id": f"www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}", "url": f"https://www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}/", 
+        if f"{video["snippet"]["title"]}" == "Deleted video" or f"{video["snippet"]["title"]}" == "Private video":
+            continue
+        else:
+            item = {"id": f"www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}", "url": f"https://www.youtube.com/watch?v={video["snippet"]["resourceId"]["videoId"]}/", 
             "title": f"{video["snippet"]["title"]}", "content_text": f"{video["snippet"]["description"]}", "date_published": f"{video["snippet"]["publishedAt"]}",
             "attachments": [{"url": f"{video["snippet"]["thumbnails"]["high"]["url"]}", "mime_type": "image/jpeg", "title":"thumbnail"}]
             }
-        formatted_items.append(item)
-
+            formatted_items.append(item)
     json_feed["items"] = formatted_items
     json_feed = json.dumps(json_feed)
     print(json_feed)
