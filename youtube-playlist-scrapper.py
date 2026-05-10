@@ -54,6 +54,7 @@ import json
 import sys
 import re
 from pathlib import Path
+import argparse
 
 try:
     from googleapiclient.discovery import build
@@ -141,14 +142,14 @@ def generate_json_feed(playlist_info: tuple):
     print(json_feed)
 
 def main():
-    if len(sys.argv) < 2 or len(sys.argv) >= 3:
-        print("Usage: python youtube-playlist-scrapper.py playlist_url")
-    else:
-        if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', sys.argv[1]):
-            playlist_id = match.group(1)
-        else: 
-            print("non-valid youtube url", file=sys.stderr)
-            sys.exit(4)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("playlist_url", help="url of playlist. example: youtube.com/playlist?list=PLnumbers", type=str)
+    args = parser.parse_args()
+    if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', args.playlist_url):
+        playlist_id = match.group(1)
+    else: 
+        print("non-valid youtube url", file=sys.stderr)
+        sys.exit(4)
     generate_json_feed(get_playlist_info(playlist_id))
 
 if __name__ == "__main__":
