@@ -118,9 +118,9 @@ def get_playlist_videos(playlist_id: str) -> list:
         sys.exit(5)
 
 def get_playlist_info(playlist_id) -> tuple:
-    channel_json = get_playlist_details(playlist_id)[0]
-    playlist_json = get_playlist_videos(playlist_id)
-    return (channel_json, playlist_json)
+    playlist_details = get_playlist_details(playlist_id)[0]
+    playlist_items = get_playlist_videos(playlist_id)
+    return (playlist_details, playlist_items)
 
 def playlist_match(url:str) -> str:
     if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', url):
@@ -131,15 +131,15 @@ def playlist_match(url:str) -> str:
         return False
 
 def generate_json_feed(playlist_info: tuple):
-    channel_json = playlist_info[0]
-    playlist_json = playlist_info[1]
+    playlist_details = playlist_info[0]
+    playlist_items = playlist_info[1]
     formatted_items = []
-    json_feed = {"version": "https://jsonfeed.org/version/1.1", "title": f"{channel_json["snippet"]["title"]}",
-        "home_page_url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}", 
-        "description": f"{channel_json["snippet"]["description"]}",
-        "authors": [{"name": f"{channel_json["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{channel_json["snippet"]["channelId"]}"}]}             
+    json_feed = {"version": "https://jsonfeed.org/version/1.1", "title": f"{playlist_details["snippet"]["title"]}",
+        "home_page_url": f"www.youtube.com/channel/{playlist_details["snippet"]["channelId"]}", 
+        "description": f"{playlist_details["snippet"]["description"]}",
+        "authors": [{"name": f"{playlist_details["snippet"]["channelTitle"]}", "url": f"www.youtube.com/channel/{playlist_details["snippet"]["channelId"]}"}]}             
 
-    for video in playlist_json:
+    for video in playlist_items:
         if f"{video["snippet"]["title"]}" == "Deleted video" or f"{video["snippet"]["title"]}" == "Private video":
             continue
         else:
