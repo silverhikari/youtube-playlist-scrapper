@@ -80,43 +80,47 @@ def get_api_key() -> str:
             print("place google api key in youtube-api-key.txt, without any extra characters", file=sys.stderr)
             sys.exit(2)
 
-def get_playlist_details(playlist_id: str, youtube) -> list:
-    details = youtube.playlists().list(
-        part='snippet',
-        id=[playlist_id],
-        fields="items(snippet(channelId,title,description,channelTitle))"
-    ).execute()
-    return details['items']
-
-def get_playlist_videos(playlist_id: str, youtube) -> list:
-    videos = []
-    next_page_token = None
-    
-    while True:
-        res = youtube.playlistItems().list(
-            part='snippet',
-            playlistId=playlist_id,
-            maxResults=50,
-            pageToken=next_page_token,
-            fields="nextPageToken,items(snippet(publishedAt,title,description,thumbnails(high),resourceId(videoId)))",
-        ).execute()
-        
-        videos.extend(res['items'])
-        next_page_token = res.get('nextPageToken')
-        
-        if not next_page_token:
-            break
-    return videos
-
-def get_playlist_info(playlist_id) -> tuple:
+def get_playlist_details(playlist_id: str,) -> list:
     try:
         with build('youtube', 'v3', developerKey=get_api_key()) as youtube:
-            channel_json = get_playlist_details(playlist_id, youtube)[0]
-            playlist_json = get_playlist_videos(playlist_id, youtube)
-            return (channel_json, playlist_json)
+            details = youtube.playlists().list(
+                part='snippet',
+                id=[playlist_id],
+                fields="items(snippet(channelId,title,description,channelTitle))"
+            ).execute()
+            return details['items']
     except(HttpError):
         print("invalid google api key", file=sys.stderr)
         sys.exit(5)
+
+def get_playlist_videos(playlist_id: str) -> list:
+    videos = []
+    next_page_token = None
+    try:
+        with build('youtube', 'v3', developerKey=get_api_key()) as youtube:
+            while True:
+                res = youtube.playlistItems().list(
+                    part='snippet',
+                    playlistId=playlist_id,
+                    maxResults=50,
+                    pageToken=next_page_token,
+                    fields="nextPageToken,items(snippet(publishedAt,title,description,thumbnails(high),resourceId(videoId)))",
+                ).execute()
+                
+                videos.extend(res['items'])
+                next_page_token = res.get('nextPageToken')
+                
+                if not next_page_token:
+                    break
+            return videos
+    except(HttpError):
+        print("invalid google api key", file=sys.stderr)
+        sys.exit(5)
+
+def get_playlist_info(playlist_id) -> tuple:
+    channel_json = get_playlist_details(playlist_id)[0]
+    playlist_json = get_playlist_videos(playlist_id)
+    return (channel_json, playlist_json)
 
 def playlist_match(url:str) -> str:
     if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', url):
