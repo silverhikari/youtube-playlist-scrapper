@@ -118,6 +118,13 @@ def get_playlist_info(playlist_id) -> tuple:
         print("invalid google api key", file=sys.stderr)
         sys.exit(5)
 
+def playlist_match(url:str) -> str:
+    if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', url):
+        return match.group(1)
+    elif match := re.search(r'^(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', url):
+        return match.group(1)
+    else:
+        return False
 
 def generate_json_feed(playlist_info: tuple):
     channel_json = playlist_info[0]
@@ -143,17 +150,15 @@ def generate_json_feed(playlist_info: tuple):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("playlist_url", help="url of playlist or id. example: youtube.com/playlist?list=PLnumbers or PLnumbers", type=str)
+    parser.add_argument("url", help="url of playlist or id. example: youtube.com/playlist?list=PLnumbers or PLnumbers", type=str)
     args = parser.parse_args()
 
-    if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', args.playlist_url):
-        playlist_id = match.group(1)
-    elif match := re.search(r'^(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', args.playlist_url):
-        playlist_id = match.group(1)
+    if playlist := playlist_match(args.url):
+        url = playlist
     else: 
         print("invalid youtube url or playlist id", file=sys.stderr)
         sys.exit(4)
-    generate_json_feed(get_playlist_info(playlist_id))
+    generate_json_feed(get_playlist_info(url))
 
 if __name__ == "__main__":
     main()
