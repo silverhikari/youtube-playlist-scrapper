@@ -24,7 +24,7 @@ limitations under the License.
 
 Youtube API v3 playlist scrapper
 
-VERSION: v2.0
+VERSION: v2.1.0
 
 this scrapper use the Youtube APIv3 to allow for podcasts/playlists to have more than 15 items, useful if you want to watch a long running series.
 this use 1 quota for to get playlist details such as title, description, along with channel id and channel name and 1 quote for every 50 items in a playlist, so for a playlist of 150 items it would cost 4 quota.
@@ -48,6 +48,29 @@ Steps:
 
 6. either create the file "youtube-api-key.txt" next to this script, and place the generated key into the first line of the file with nothing before or after
 (the program will attempt to remove whitespace when reading the key but still better to not add it), or you can run the script first it will generate the file if it is not there
+
+Changelog:
+
+Major.Minor.Fix
+
+Major: anything that changes how users input the url but not a background input change or the addition of optional arguments
+
+Minor: anthing that changes in the program usually on the processing end
+
+Fix: anything that fixes a small issue or problem that isn't bigger than a few lines
+
+version 1.0.0: inital creation
+
+version 1.1.0: modular refactor into functions
+
+version 1.1.1: various fixes with missing sys.exits and correcting with opener using incorrect variable
+
+version 1.2.0: added argparse support instead of basic varg handling
+
+version 2.0.0: added playlist id support in url input
+
+version 2.1.0: added pretty file output support
+
 '''
 
 import json
@@ -119,7 +142,7 @@ def get_playlist_info(playlist_id) -> tuple:
         sys.exit(5)
 
 
-def generate_json_feed(playlist_info: tuple):
+def generate_json_feed(playlist_info: tuple) -> dict:
     channel_json = playlist_info[0]
     playlist_json = playlist_info[1]
     formatted_items = []
@@ -138,12 +161,27 @@ def generate_json_feed(playlist_info: tuple):
             }
             formatted_items.append(item)
     json_feed["items"] = formatted_items
-    json_feed = json.dumps(json_feed)
-    print(json_feed)
+    return json_feed
+
+def output_file(filename_path:Path, json_feed):
+    filename = filename_path.stem
+    suffix = filename_path.suffix
+    if suffix == "":
+        filename_path = filename_path.with_suffix(".json")
+    counter = 1
+
+    while Path.exists(filename_path):
+        filename_path = filename_path.with_stem(f"{filename} ({counter})")
+        counter += 1
+    
+    with filename_path.open('w') as json_file:
+        json.dump(json_feed, json_file, indent=2)
+    sys.exit(f"json feed file created at '{filename_path}'")
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("playlist_url", help="url of playlist or id. example: youtube.com/playlist?list=PLnumbers or PLnumbers", type=str)
+    parser.add_argument("-o", "--output", help="path of output file, if no suffix is given will default to .json", type=Path)
     args = parser.parse_args()
 
     if match := re.search(r'^(?:https?:\/\/)?(?:www.)?youtube\.com\/playlist\?list=(PL[A-Za-z0-9_-]{32}|PL[0-9A-F]{14})$', args.playlist_url):
@@ -153,7 +191,11 @@ def main():
     else: 
         print("invalid youtube url or playlist id", file=sys.stderr)
         sys.exit(4)
-    generate_json_feed(get_playlist_info(playlist_id))
+    
+    json_feed = generate_json_feed(get_playlist_info(playlist_id))
+    if args.output and not args.output == "":
+            output_file(args.output, json_feed)
+    print(json.dumps(json_feed))
 
 if __name__ == "__main__":
     main()

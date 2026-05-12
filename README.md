@@ -31,9 +31,16 @@ set source to script and in the box add:
 
 ### Standalone
 
-the script can be run standalone via piping the output into a json file.
+the script can be run standalone via piping the output into a json file or by running '-o' or '--output', either way works though running output will allow for better looking output and if the file already exists will not overwrite and instead add enumeration to the filename.
 
+> [!NOTE]
+> if no suffix is added to the filename, will default to .json
+
+piping:
 `python youtube-playlist-scrapper.py youtube_playlist_url > feed.json`
+
+output:
+`python youtube-playlist-scrapper.py youtube_playlist_url -o "path/filename"`
 
 ## Problems
 
